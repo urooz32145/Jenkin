@@ -1,2 +1,2 @@
-apt install nginx
+apt install nginx -y
 systemctl status nginx
