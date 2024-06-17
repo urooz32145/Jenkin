@@ -1,0 +1,75 @@
+---
+- name: Usermanager
+  become: true
+  hosts: web
+  tasks:
+    # Group creation
+    - name: group_creation
+      group:
+        name: '{{item}}'
+        state: present
+      with_items:
+        - "NINJA_group"
+        - "TEAM"
+    # Creating directory in skel directory
+    - name: directory_creation
+      file:
+        path: /etc/skel/{{item}}
+        state: directory
+      with_items:
+        - "ninja"
+        - "team"
+    #applying the permissions to directory
+    - name: Ansible create directory and set permissions
+      file:
+        path: /etc/skel/{{item}}
+        group: NINJA_group
+        mode: 771
+      with_items:
+        - "ninja"
+        - "team"
+    # Creating user and adding it to group
+    - name: adding_user_to_group_ninja
+      user:
+        name: "{{item}}"
+        password: '!'
+        group: NINJA_group
+        create_home: true
+        state: present
+        shell: /bin/bash
+      with_items:
+        - "NINJA01"
+        - "NINJA02"
+    - name: adding_user_to_group_team
+      user:
+        name: "{{item}}"
+        password: '!'
+        group: TEAM
+        create_home: true
+        state: present
+        shell: /bin/bash
+      with_items:
+        - "team01"
+        - "team02"
+    #listing user
+    - name: list_user
+      getent:
+        database: passwd
+#deleting a user
+    - name: deleting_user
+      user:
+        name: "{{item}}"
+        state: absent
+      loop:
+        - "NINJA01"
+        - "NINJA02"
+        - "team01"
+        - "team02"
+#deleting a group
+    - name: deleting_group
+      group:
+        name: "{{item}}"
+        state: absent
+      with_items:
+        - "NINJA_group"
+        - "TEAM"

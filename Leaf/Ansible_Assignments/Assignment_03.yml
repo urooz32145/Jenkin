@@ -1,0 +1,129 @@
+#Ansible Assignment-3
+---
+ - name:  provisioning EC2 instances using Ansible
+   hosts: localhost
+   connection: local
+   gather_facts: False
+   tags: provisioning
+
+# located in my another file just including thoese varable here
+
+   vars:
+     keypair: server_key.pem
+     instance_type: t2.small
+     image: ami-07b36ea9852e986ad 
+     wait: yes
+     group: webserver
+     count: 1
+     region: us-east-2
+     security_group: my-jenkins-security-grp
+   
+   tasks:
+
+     - name: Task # 1 - Create my security group
+       local_action: 
+         module: ec2_group
+         name: "{{ security_group }}"
+         description: Security Group for webserver Servers
+         region: "{{ region }}"
+         rules:
+            - proto: tcp
+              from_port: 22
+              to_port: 22
+              cidr_ip: 0.0.0.0/0
+            - proto: tcp
+              from_port: 8080
+              to_port: 8080
+              cidr_ip: 0.0.0.0/0
+            - proto: tcp
+              from_port: 80
+              to_port: 80
+              cidr_ip: 0.0.0.0/0
+         rules_egress:
+            - proto: all
+              cidr_ip: 0.0.0.0/0
+       register: basic_firewall
+     - name: Task # 2 Launch the new EC2 Instance
+       local_action:  ec2 
+                      group={{ security_group }} 
+                      instance_type={{ instance_type}} 
+                      image={{ image }} 
+                      wait=true 
+                      region={{ region }} 
+                      keypair={{ keypair }}
+                      count={{count}}
+       register: ec2
+     - name: Task # 3 Add Tagging to EC2 instance
+       local_action: ec2_tag resource={{ item.id }} region={{ region }} state=present
+       with_items: "{{ ec2.instances }}"
+       args:
+         tags:
+           Name: MyTargetEc2Instance
+
+
+
+Setup Spring3HibernateApp (https://github.com/opstree/spring3hibernate) on created infra using ansible playbook by following the below steps:
+Install MySQL
+Create the war file for Spring3HibernateApp using maven
+Install JDK 11
+Install Tomcat
+Send the war file created earlier to path "/opt/tomcat/apache-tomcat-7.0.108/webapps/"
+Restart tomcat service
+(edited)
+opstree/spring3hibernate
+A java loaded application for various testing purpose
+Website
+https://opstree.github.io
+
+
+- name: Deploy Spring3HibernateApp
+  hosts: all
+  become: yes
+  tasks:
+    - name: package install
+      apt:
+        name:
+          - mysql-server
+          - openjdk-11-jdk
+          - maven
+          - tomcat9
+          - tomcat9-admin
+        state: present
+        update_cache: yes
+
+    - name: creating directory to clone spring3hibernate repo
+      file:
+        dest: /home/urooz/spring3hibernate
+        state: directory
+
+    - name: clone Spring3HibernateApp to destination directory
+      git:
+        clone: true
+        repo: https://github.com/opstree/spring3hibernate.git
+        dest: /home/urooz/spring3hibernate
+
+    - name: Generating war file
+      command:
+        cmd: "mvn clean install"
+        chdir: "/home/urooz/spring3hibernate"
+
+    - name: copy war file to destination path to tomcat webapps directory
+      copy:
+        src: /home/urooz/spring3hibernate/target/Spring3HibernateApp.war
+        dest: /var/lib/tomcat9/webapps/
+        remote_src: yes
+
+    - name: Add roles to tomcat-users.xml
+      lineinfile:
+        path: /etc/tomcat9/tomcat-users.xml
+        line: "{{ item }}"
+        insertbefore: </tomcat-users>
+      with_items:
+        - '<role rolename="admin-gui"/>'
+        - '<role rolename="manager-gui"/>'
+        - '<user username="tomcat" password="pass" roles="admin-gui,manager-gui"/>'
+
+    - name: restart tomcat service
+      service:
+        name: tomcat9
+        state: restarted
